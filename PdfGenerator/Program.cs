@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -7,6 +8,8 @@ using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using ColorCode;
+using PdfSharp.Drawing;
+using PdfSharp.Pdf;
 
 namespace PdfGenerator
 {
@@ -14,7 +17,7 @@ namespace PdfGenerator
     {
         private const int CODETAGLEN = 6;
 
-        private static void WritePdf(string filename)
+        private static void XmlToPdf(string filename)
         {
             var fileText = File.ReadAllText(filename);
 
@@ -25,10 +28,10 @@ namespace PdfGenerator
                 //Console.WriteLine("Found {0} at index {1} of Length {2}.", m.Value, m.Index, m.Length);
                 var mIndex = m.Index;
                 var endIndex = fileText.IndexOf("</code>", mIndex, StringComparison.Ordinal);
-                if ( endIndex > 0)
+                if (endIndex > 0)
                 {
                     m = m.NextMatch();
-                    if (endIndex < m.Index || m.Index==0)
+                    if (endIndex < m.Index || m.Index == 0)
                     {
                         codeBlocks[mIndex] = endIndex;
                     }
@@ -56,22 +59,39 @@ namespace PdfGenerator
             }
             fileText = builderCode.ToString();
             var doc = XDocument.Parse(fileText);
-            foreach (XElement el in doc.Root.Elements())
+            GeneratePdf(doc);
+
+        }
+
+        private static void GeneratePdf(XDocument doc)
+        {
+            if (doc.Root == null) return; //maybe throw?
+
+            var document = new PdfDocument();
+            var page = document.AddPage();
+            var gfx = XGraphics.FromPdfPage(page);
+            var font = new XFont("Verdana", 20, XFontStyle.Bold);
+            foreach (var el in doc.Root.Elements())
             {
-                Console.WriteLine("{0}", el.NextNode);
+                //Console.WriteLine("{0}", el.NextNode);
+                if (el.NextNode != null)
+                    gfx.DrawString(el.NextNode.ToString(), font, XBrushes.Black, new XRect(0, 0, page.Width, page.Height), XStringFormat.Center);
                 //Console.WriteLine("  Attributes:");
                 //foreach (XAttribute attr in el.Attributes())
                 //    Console.WriteLine("    {0}", attr);
                 //Console.WriteLine("  Elements:");
 
-                foreach (XElement element in el.Elements())
+                foreach (var element in el.Elements())
                     Console.WriteLine("    {0}: {1}", element.Name, element.Value);
             }
+            string filename = "HelloWorld.pdf";
+            document.Save(filename);
+            Process.Start(filename);
         }
 
         static void Main(string[] args)
         {
-            WritePdf(@"C:\Users\Piotr\Dysk Google\C++ CPA Laboratoria\sławek\01_1.2.6.1.txt");
+            XmlToPdf(@"C:\Users\Piotr\Dysk Google\C++ CPA Laboratoria\sławek\01_1.2.6.1.txt");
             //var sourceCode = File.ReadAllText(@"../../Program.cs");
             //var colorizedSourceCode = new CodeColorizer().Colorize(sourceCode, Languages.CSharp);
             
