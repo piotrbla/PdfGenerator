@@ -85,7 +85,7 @@ namespace PdfGenerator
                 document.Save(documentFilename);//if i forgot to close acrobat
             }
             
-            Process.Start(documentFilename);
+            //Process.Start(documentFilename);
         }
 
         private static PdfDocument GenerateDocInMemory(XDocument doc)
@@ -164,10 +164,22 @@ namespace PdfGenerator
 
         static void Main(string[] args)
         {
-            XmlToPdf(@"C:\Users\Piotr\Dysk Google\C++ CPA Laboratoria\sławek\v2\02_1.4.40.1.txt");
+            foreach (var filename in Directory.GetFiles(@"C:\Users\Piotr\Dysk Google\C++ CPA Laboratoria\sławek\v2\", "*.txt"))
+            {
+                try
+                {
+                    XmlToPdf(filename);
+                }
+                catch (Exception ex)
+                {
+                    File.AppendAllText("log.txt", "===================");
+                    File.AppendAllText("log.txt", filename);
+                    File.AppendAllText("log.txt", ex.ToString());
+                }
+            }
             //var sourceCode = File.ReadAllText(@"../../Program.cs");
             //var colorizedSourceCode = new CodeColorizer().Colorize(sourceCode, Languages.CSharp);
-            
+
             //Console.WriteLine(colorizedSourceCode);
         }
     }
