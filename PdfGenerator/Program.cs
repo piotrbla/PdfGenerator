@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using ColorCode;
 using PdfSharp.Drawing;
+using PdfSharp.Drawing.Layout;
 using PdfSharp.Pdf;
 
 namespace PdfGenerator
@@ -55,7 +57,7 @@ namespace PdfGenerator
                 var oldLength = builderCode.Length;
                 builderCode.Replace("<", "&lt;", begin, element.Value - begin);
                 var diffLength = builderCode.Length - oldLength;
-                builderCode.Replace(">", "&lt;", begin, element.Value - begin + diffLength);
+                builderCode.Replace(">", "&gt;", begin, element.Value - begin + diffLength);
             }
             fileText = builderCode.ToString();
             var doc = XDocument.Parse(fileText);
@@ -71,22 +73,42 @@ namespace PdfGenerator
             var page = document.AddPage();
             var gfx = XGraphics.FromPdfPage(page);
             var font = new XFont("Verdana", 20, XFontStyle.Bold);
+            XTextFormatter tf = new XTextFormatter(gfx);
+            var margin = 30;
+            var y = margin;
             foreach (var el in doc.Root.Elements())
             {
                 //Console.WriteLine("{0}", el.NextNode);
                 if (el.NextNode != null)
-                    gfx.DrawString(el.NextNode.ToString(), font, XBrushes.Black, new XRect(0, 0, page.Width, page.Height), XStringFormat.Center);
+                {
+                    var nodeText = el.NextNode.ToString();
+                    var linesCount = nodeText.Count(c => c == '\n') + 1;
+
+                    double blockHeigth = 30 * linesCount *3;
+                    XRect rect = new XRect(margin , y, page.Width - margin, blockHeigth);
+                    gfx.DrawRectangle(XBrushes.WhiteSmoke , rect);
+                    //tf.Alignment = ParagraphAlignment.Left;
+                    tf.DrawString(ReplaceXmlTags(nodeText), font, XBrushes.Black, rect, XStringFormats.TopLeft);
+                    //gfx.DrawString(el.NextNode.ToString(), font, XBrushes.Black, x, y);
+                    y += (int)blockHeigth;
+                }
                 //Console.WriteLine("  Attributes:");
                 //foreach (XAttribute attr in el.Attributes())
                 //    Console.WriteLine("    {0}", attr);
                 //Console.WriteLine("  Elements:");
 
-                foreach (var element in el.Elements())
-                    Console.WriteLine("    {0}: {1}", element.Name, element.Value);
+                //foreach (var element in el.Elements())
+                //    Console.WriteLine("    {0}: {1}", element.Name, element.Value);
             }
             string filename = "HelloWorld.pdf";
             document.Save(filename);
             Process.Start(filename);
+        }
+
+        private static string ReplaceXmlTags(string toString)
+        {
+            var result = toString.Replace("&lt;", "<");
+            return result.Replace("&gt;", ">");
         }
 
         static void Main(string[] args)
