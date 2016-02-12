@@ -65,6 +65,13 @@ namespace PdfGenerator
 
         }
 
+        private static void DrawPie(XGraphics gfx, int y)
+        {
+            XPen pen = new XPen(XColors.DarkBlue, 2.5);
+            gfx.DrawPie(pen, XBrushes.Gold, 50, y, 20, 20, 215, 290);
+        }
+
+
         private static void GeneratePdf(XDocument doc)
         {
             if (doc.Root == null) return; //maybe throw?
@@ -72,37 +79,73 @@ namespace PdfGenerator
             var document = new PdfDocument();
             var page = document.AddPage();
             var gfx = XGraphics.FromPdfPage(page);
-            var font = new XFont("Verdana", 20, XFontStyle.Bold);
+            var font = new XFont("Verdana", 16, XFontStyle.Bold);
             XTextFormatter tf = new XTextFormatter(gfx);
             var margin = 30;
             var y = margin;
+            const int lineSize = 60;
             foreach (var el in doc.Root.Elements())
             {
-                //Console.WriteLine("{0}", el.NextNode);
-                if (el.NextNode != null)
+                if (el.HasElements)
                 {
-                    var nodeText = el.NextNode.ToString();
-                    var linesCount = nodeText.Count(c => c == '\n') + 1;
-
-                    double blockHeigth = 30 * linesCount *3;
-                    XRect rect = new XRect(margin , y, page.Width - margin, blockHeigth);
-                    gfx.DrawRectangle(XBrushes.WhiteSmoke , rect);
-                    //tf.Alignment = ParagraphAlignment.Left;
-                    tf.DrawString(ReplaceXmlTags(nodeText), font, XBrushes.Black, rect, XStringFormats.TopLeft);
-                    //gfx.DrawString(el.NextNode.ToString(), font, XBrushes.Black, x, y);
-                    y += (int)blockHeigth;
+                    foreach (var subElement in el.Elements())
+                    {
+                        var nodeText = subElement.NextNode.ToString();
+                        var linesCount = CountLines(nodeText);
+                        double blockHeight = lineSize * linesCount ;
+                        XRect rect = new XRect(margin, y, page.Width - margin, blockHeight);
+                        DrawPie(gfx, y);
+                        gfx.DrawRectangle(XBrushes.WhiteSmoke, rect);
+                        tf.DrawString(ReplaceXmlTags(nodeText), font, XBrushes.Black, rect, XStringFormats.TopLeft);
+                        y += (int)blockHeight;
+                    }
                 }
-                //Console.WriteLine("  Attributes:");
-                //foreach (XAttribute attr in el.Attributes())
-                //    Console.WriteLine("    {0}", attr);
-                //Console.WriteLine("  Elements:");
+                else
+                {
+                    if (el.NextNode != null)
+                    {
+                        var nodeText = el.NextNode.ToString();
+                        var linesCount = CountLines(nodeText);
 
-                //foreach (var element in el.Elements())
-                //    Console.WriteLine("    {0}: {1}", element.Name, element.Value);
+                        double blockHeight = lineSize * linesCount;
+                        XRect rect = new XRect(margin, y, page.Width - margin, blockHeight);
+                        gfx.DrawRectangle(XBrushes.WhiteSmoke, rect);
+                        tf.DrawString(ReplaceXmlTags(nodeText), font, XBrushes.Black, rect, XStringFormats.TopLeft);
+                        y += (int)blockHeight;
+
+
+                    }
+                }
             }
             string filename = "HelloWorld.pdf";
-            document.Save(filename);
+            try
+            {
+                document.Save(filename);
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("Couldn't create pdf, close pdf software (ie. Adobe Acrobat Reader) and press key.");
+                Console.ReadKey();
+                document.Save(filename);//if i forgot to close acrobat
+            }
+            
             Process.Start(filename);
+        }
+
+        private static int CountLines(string nodeText)
+        {
+            var count = 0;
+            var actualCount = 0;
+            for (int i = 0; i < nodeText.Length; i++)
+            {
+                if (nodeText[i] == '\n' || actualCount > 40)
+                {
+                    actualCount = 0;
+                    count++;
+                }
+            }
+            if (count < 1) count = 1;
+            return count;
         }
 
         private static string ReplaceXmlTags(string toString)
