@@ -19,10 +19,8 @@ namespace PdfGenerator
     {
         private const int CODETAGLEN = 6;
 
-        private static void XmlToPdf(string filename)
+        private static string TransformAndGenerate(string fileText)
         {
-            var fileText = File.ReadAllText(filename);
-
             var codeBlocks = new Dictionary<int, int>();
             var m = Regex.Match(fileText, @"<code>");
             while (m.Success)
@@ -59,27 +57,45 @@ namespace PdfGenerator
                 var diffLength = builderCode.Length - oldLength;
                 builderCode.Replace(">", "&gt;", begin, element.Value - begin + diffLength);
             }
-            fileText = builderCode.ToString();
-            var doc = XDocument.Parse(fileText);
-            GeneratePdf(doc);
-
+            return builderCode.ToString();
         }
 
+        const int PieSize = 16;
         private static void DrawPie(XGraphics gfx, int y)
         {
             XPen pen = new XPen(XColors.DarkBlue, 2.5);
-            gfx.DrawPie(pen, XBrushes.Gold, 50, y, 20, 20, 215, 290);
+            gfx.DrawPie(pen, XBrushes.Gold, 10, y, PieSize, PieSize, 215, 290);
         }
 
 
-        private static void GeneratePdf(XDocument doc)
+        private static void GeneratePdf(XDocument doc, string filename)
         {
-            if (doc.Root == null) return; //maybe throw?
+            var document = GenerateDocInMemory(doc);
+            var fileNameWithoutExt = Path.GetFileNameWithoutExtension(filename);
+            var pathName = Path.GetDirectoryName( filename);
+            var documentFilename = Path.Combine(pathName, "prod_" + fileNameWithoutExt + ".pdf");
+            try
+            {
+                document.Save(documentFilename);
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("Couldn't create pdf, close pdf software (ie. Adobe Acrobat Reader) and press key.");
+                Console.ReadKey();
+                document.Save(documentFilename);//if i forgot to close acrobat
+            }
+            
+            Process.Start(documentFilename);
+        }
+
+        private static PdfDocument GenerateDocInMemory(XDocument doc)
+        {
+            if (doc.Root == null) throw new Exception("Error after parsing xml");
 
             var document = new PdfDocument();
             var page = document.AddPage();
             var gfx = XGraphics.FromPdfPage(page);
-            var font = new XFont("Verdana", 16, XFontStyle.Bold);
+            var font = new XFont("Verdana", 14, XFontStyle.Bold);
             XTextFormatter tf = new XTextFormatter(gfx);
             var margin = 30;
             var y = margin;
@@ -90,46 +106,28 @@ namespace PdfGenerator
                 {
                     foreach (var subElement in el.Elements())
                     {
-                        var nodeText = subElement.NextNode.ToString();
+                        var nodeText = subElement.Value;
                         var linesCount = CountLines(nodeText);
-                        double blockHeight = lineSize * linesCount ;
+                        double blockHeight = lineSize*linesCount;
                         XRect rect = new XRect(margin, y, page.Width - margin, blockHeight);
                         DrawPie(gfx, y);
                         gfx.DrawRectangle(XBrushes.WhiteSmoke, rect);
                         tf.DrawString(ReplaceXmlTags(nodeText), font, XBrushes.Black, rect, XStringFormats.TopLeft);
-                        y += (int)blockHeight;
+                        y += (int) blockHeight;
                     }
                 }
                 else
                 {
-                    if (el.NextNode != null)
-                    {
-                        var nodeText = el.NextNode.ToString();
-                        var linesCount = CountLines(nodeText);
-
-                        double blockHeight = lineSize * linesCount;
-                        XRect rect = new XRect(margin, y, page.Width - margin, blockHeight);
-                        gfx.DrawRectangle(XBrushes.WhiteSmoke, rect);
-                        tf.DrawString(ReplaceXmlTags(nodeText), font, XBrushes.Black, rect, XStringFormats.TopLeft);
-                        y += (int)blockHeight;
-
-
-                    }
+                    var nodeText = el.Value;
+                    var linesCount = CountLines(nodeText);
+                    double blockHeight = lineSize*linesCount;
+                    XRect rect = new XRect(margin, y, page.Width - margin, blockHeight);
+                    gfx.DrawRectangle(XBrushes.WhiteSmoke, rect);
+                    tf.DrawString(ReplaceXmlTags(nodeText), font, XBrushes.Black, rect, XStringFormats.TopLeft);
+                    y += (int) blockHeight;
                 }
             }
-            string filename = "HelloWorld.pdf";
-            try
-            {
-                document.Save(filename);
-            }
-            catch (Exception)
-            {
-                Console.WriteLine("Couldn't create pdf, close pdf software (ie. Adobe Acrobat Reader) and press key.");
-                Console.ReadKey();
-                document.Save(filename);//if i forgot to close acrobat
-            }
-            
-            Process.Start(filename);
+            return document;
         }
 
         private static int CountLines(string nodeText)
@@ -154,9 +152,19 @@ namespace PdfGenerator
             return result.Replace("&gt;", ">");
         }
 
+        private static void XmlToPdf(string filename)
+        {
+            var fileText = File.ReadAllText(filename);
+            var transformedText = TransformAndGenerate(fileText);
+            var doc = XDocument.Parse(transformedText);
+            GeneratePdf(doc, filename);
+
+        }
+
+
         static void Main(string[] args)
         {
-            XmlToPdf(@"C:\Users\Piotr\Dysk Google\C++ CPA Laboratoria\sławek\01_1.2.6.1.txt");
+            XmlToPdf(@"C:\Users\Piotr\Dysk Google\C++ CPA Laboratoria\sławek\v2\02_1.4.40.1.txt");
             //var sourceCode = File.ReadAllText(@"../../Program.cs");
             //var colorizedSourceCode = new CodeColorizer().Colorize(sourceCode, Languages.CSharp);
             
